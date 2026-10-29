@@ -3,3 +3,5 @@ obj/
 .vs/
 *.user
 models/
+# API keys for cloud STT providers
+secrets.json

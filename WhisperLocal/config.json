@@ -11,13 +11,34 @@
     "DeviceName": "",
     "MaxDurationSec": 120
   },
+  "Stt": {
+    // Who transcribes: "Local" (bundled whisper-server on the GPU), "Groq" or "Cloudflare".
+    // Cloud providers send the audio to the internet. API keys go to secrets.json next to the exe (not into git):
+    //   { "GroqApiKey": "gsk_...", "CloudflareApiToken": "..." }
+    // or to the GROQ_API_KEY / CLOUDFLARE_API_TOKEN environment variables.
+    "Provider": "Local",
+    // If the cloud request fails (no key, rate limit, no internet), transcribe the same audio locally
+    "FallbackToLocal": true,
+    "CloudTimeoutSec": 30,
+    "Groq": {
+      "Url": "https://api.groq.com/openai/v1/audio/transcriptions",
+      // "whisper-large-v3" (same model as local) or "whisper-large-v3-turbo" (faster, weaker on Ukrainian)
+      "Model": "whisper-large-v3"
+    },
+    "Cloudflare": {
+      // Cloudflare dashboard → Workers AI → account ID
+      "AccountId": "",
+      "Model": "@cf/openai/whisper-large-v3-turbo"
+    }
+  },
   "Whisper": {
     "ServerExe": "whisper\\whisper-server.exe",
     "ModelPath": "models\\ggml-large-v3.bin",
     "Host": "127.0.0.1",
     "Port": 8178,
     "InferencePath": "/inference",
-    "ExtraArgs": "-dev 0 -sns -t 8",
+    "ExtraArgs": "-dev 0 -sns -t 24",
+    // uk - ukrainian, ru - russian, en - english, auto - detect from audio
     "Language": "uk",
     "Temperature": 0,
     // Hint for Whisper: terms listed here are more likely to be written exactly like this (keep it short)
@@ -28,7 +49,7 @@
   },
   "Memory": {
     // Unload all servers and models after this many minutes without dictation (0 = never)
-    "IdleUnloadMinutes": 5
+    "IdleUnloadMinutes": 25
   },
   "Filter": {
     "MinDurationMs": 500,

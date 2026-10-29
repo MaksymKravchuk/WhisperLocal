@@ -59,7 +59,7 @@ internal static class BatchRunner
 
         using var configScope = config;
         Log.DebugEnabled = config.Current.Logging.Debug;
-        using var stt = new WhisperServerStt(config);
+        using var stt = new SttRouter(config, new WhisperServerStt(config));
         using var llm = new OllamaCleaner(config);
         var pipeline = new DictationPipeline(config, stt, llm);
 
@@ -73,7 +73,7 @@ internal static class BatchRunner
             return 1;
         }
 
-        var csv = new StringBuilder("file;audio_s;stt_ms;llm_ms;total_ms;llm_used;note;raw;dictionary;final\n");
+        var csv = new StringBuilder("file;audio_s;stt_provider;stt_ms;llm_ms;total_ms;llm_used;note;raw;dictionary;final\n");
         var txt = new StringBuilder();
         var failures = 0;
 
@@ -84,10 +84,10 @@ internal static class BatchRunner
             {
                 var pcm = AudioConvert.LoadFile(file);
                 var r = await pipeline.ProcessAsync(pcm, null, CancellationToken.None);
-                csv.AppendJoin(';', Csv(name), (r.AudioMs / 1000).ToString("F1"), r.SttMs, r.LlmMs, r.TotalMs, r.LlmUsed,
+                csv.AppendJoin(';', Csv(name), (r.AudioMs / 1000).ToString("F1"), Csv(r.SttProvider), r.SttMs, r.LlmMs, r.TotalMs, r.LlmUsed,
                         Csv(r.Note), Csv(r.RawText), Csv(r.DictionaryText), Csv(r.FinalText))
                     .Append('\n');
-                txt.Append($"=== {name} ({r.AudioMs / 1000:F1} s, stt {r.SttMs} ms, llm {r.LlmMs} ms, total {r.TotalMs} ms) ===\n")
+                txt.Append($"=== {name} ({r.AudioMs / 1000:F1} s, stt {r.SttProvider} {r.SttMs} ms, llm {r.LlmMs} ms, total {r.TotalMs} ms) ===\n")
                     .Append($"RAW:   {r.RawText}\n")
                     .Append($"FINAL: {r.FinalText}\n");
                 if (!string.IsNullOrEmpty(r.Note))
@@ -98,7 +98,7 @@ internal static class BatchRunner
             {
                 failures++;
                 Log.Error($"Batch: {name} failed", ex);
-                csv.Append($"{Csv(name)};;;;;;{Csv("ERROR: " + ex.Message)};;;\n");
+                csv.Append($"{Csv(name)};;;;;;;{Csv("ERROR: " + ex.Message)};;;\n");
             }
         }
 

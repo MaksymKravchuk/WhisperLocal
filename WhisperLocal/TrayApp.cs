@@ -23,7 +23,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ToolStripMenuItem _unloadItem;
     private readonly KeyboardHook _hook;
     private readonly AudioRecorder _recorder = new();
-    private readonly WhisperServerStt _stt;
+    private readonly SttRouter _stt;
     private readonly OllamaCleaner _llm;
     private readonly DictationPipeline _pipeline;
     private readonly TextInserter _inserter = new();
@@ -35,6 +35,7 @@ internal sealed class TrayApp : ApplicationContext
     private long _pressedAt;
     private DateTime _lastActivityUtc = DateTime.UtcNow;
     private bool _modelDialogOpen;
+    private bool _fallbackNotified;
     private ForegroundApp? _target;
 
     public TrayApp(ConfigManager config)
@@ -44,7 +45,7 @@ internal sealed class TrayApp : ApplicationContext
         _ui = SynchronizationContext.Current!;
 
         _config = config;
-        _stt = new WhisperServerStt(config);
+        _stt = new SttRouter(config, new WhisperServerStt(config));
         _llm = new OllamaCleaner(config);
         _pipeline = new DictationPipeline(config, _stt, _llm);
 
@@ -129,9 +130,9 @@ internal sealed class TrayApp : ApplicationContext
 
         var cfg = _config.Current;
 
-        // Do not let the user dictate for nothing
+        // Do not let the user dictate for nothing (cloud backends need no local model)
         var modelPath = AppPaths.Resolve(cfg.Whisper.ModelPath);
-        if (!File.Exists(modelPath))
+        if (_stt.UsesLocal && !File.Exists(modelPath))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
             ShowModelMissing(new ModelNotFoundException(modelPath));
@@ -176,6 +177,7 @@ internal sealed class TrayApp : ApplicationContext
             }
 
             var result = await _pipeline.ProcessAsync(pcm, _target?.ProcessName, CancellationToken.None);
+            NotifyCloudFallback();
             if (string.IsNullOrWhiteSpace(result.FinalText))
                 return;
 
@@ -246,6 +248,24 @@ internal sealed class TrayApp : ApplicationContext
         {
             ReportError("whisper-server start failed", ex);
         }
+    }
+
+    /// <summary>
+    /// One balloon when the cloud backend starts failing (bad key, limit, no internet);
+    /// silent while it keeps failing, armed again after the next successful cloud call.
+    /// </summary>
+    private void NotifyCloudFallback()
+    {
+        var reason = _stt.LastFallbackReason;
+        if (reason == null)
+        {
+            _fallbackNotified = false;
+            return;
+        }
+        if (_fallbackNotified)
+            return;
+        _fallbackNotified = true;
+        Notify($"Cloud STT failed, used local Whisper instead. {reason}", ToolTipIcon.Warning);
     }
 
     /// <summary>A missing model gets a dialog with download instructions; other errors a tray balloon.</summary>

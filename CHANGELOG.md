@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 — 2026-10-29
+
+- Optional cloud speech recognition: `Stt.Provider` = `Groq` (whisper-large-v3 / turbo) or `Cloudflare` Workers AI (whisper-large-v3-turbo); `Local` stays the default.
+- API keys in `secrets.json` next to the exe or in environment variables, never in `config.json`.
+- Automatic fallback to the local whisper-server when the cloud request fails, with one tray warning.
+- The provider that produced the text is shown in the log and in the `--batch` CSV.
+
 ## 1.0.0 — 2026-10-27
 
 First working version.

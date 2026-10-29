@@ -3,12 +3,13 @@
 *Українською: [README.uk.md](README.uk.md)*
 
 Local push-to-talk dictation for Windows (Wispr Flow–style): hold a hotkey, speak, release —
-the recognized text is pasted into the active window. Everything runs locally and portably on the GPU
-(bundled whisper.cpp Vulkan build); nothing is installed or auto-updated.
+the recognized text is pasted into the active window. By default everything runs locally and portably on the GPU
+(bundled whisper.cpp Vulkan build); nothing is installed or auto-updated. Optionally the recognition can be
+sent to a cloud Whisper (Groq or Cloudflare Workers AI) instead, with automatic fallback to the local one.
 
 ```
 Hotkey (WH_KEYBOARD_LL) → WASAPI capture → 16 kHz mono
-  → whisper-server (bundled child process, HTTP /inference)
+  → whisper-server (bundled child process, HTTP /inference)  |  or Groq / Cloudflare (Stt.Provider)
   → hallucination filter + regex dictionary
   → optional LLM cleanup (disabled by default)
   → clipboard + Ctrl+V, clipboard restored
@@ -69,8 +70,34 @@ Key settings:
 - `StartWithWindows` — per-user Run registry entry pointing to the exe that applied the setting.
 - `Hotkey.Key` — Keys names joined with `+`: `LControlKey+LWin` (default), `LMenu+LWin`, `RMenu`, `F13`…
 - `Audio.DeviceName` — part of the microphone name; empty = Windows default.
-- `Whisper.ExtraArgs` — defaults to `-dev 0 -sns -t 8` (GPU index, suppress non-speech tokens, threads); add `-bs 5` for beam search.
+- `Whisper.ExtraArgs` — `-dev 0 -sns -t 24` in the shipped config: GPU index, suppress non-speech tokens, CPU threads
+  (set `-t` to the number of physical cores or logical threads; it matters only with `-ng`, CPU-only mode).
+  Add `-bs 5` for beam search (slightly more accurate, slower).
 - `Memory.IdleUnloadMinutes` — auto-unload after inactivity (default 5).
+- `Stt.Provider` — `Local` (default), `Groq` or `Cloudflare`, see below.
+
+## Cloud speech recognition (optional)
+
+Instead of the local whisper-server the audio can be sent to a cloud Whisper. This frees the GPU and
+works on PCs without one, but **the audio leaves the computer** and free tiers have rate limits.
+
+| Provider | Model | What you need |
+|---|---|---|
+| [Groq](https://console.groq.com) | `whisper-large-v3` (default, same as local) or `whisper-large-v3-turbo` | API key |
+| [Cloudflare Workers AI](https://dash.cloudflare.com) | `@cf/openai/whisper-large-v3-turbo` | account ID + API token with Workers AI permission |
+
+1. Put the keys into `secrets.json` next to the exe (ignored by git, read on every request):
+   ```json
+   { "GroqApiKey": "gsk_...", "CloudflareApiToken": "..." }
+   ```
+   or set the `GROQ_API_KEY` / `CLOUDFLARE_API_TOKEN` environment variables.
+2. For Cloudflare set `Stt.Cloudflare.AccountId` in the config.
+3. Set `Stt.Provider` to `Groq` or `Cloudflare`; it applies on the next dictation.
+
+Language, initial prompt, dictionary and filters work the same for every provider. With `Stt.FallbackToLocal`
+(default `true`) a failed cloud request (missing key, rate limit, no internet) is transcribed locally instead;
+the tray shows one warning and the log line says `(Local (fallback))`. Each log line names the provider that
+produced the text, and `--batch` writes it to the CSV, so providers can be compared on the same recordings.
 
 ## English terms in Ukrainian speech
 

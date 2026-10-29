@@ -56,8 +56,11 @@ public sealed class WhisperServerStt : ISpeechToText
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(c.RequestTimeoutSec));
 
+        Log.Info($"STT request -> Local whisper-server ({Path.GetFileName(c.ModelPath)}): {wav.Length / 1024} KB audio, {c.Host}:{c.Port}");
+        var sw = Stopwatch.StartNew();
         using var response = await _http.PostAsync(BaseUrl(c) + c.InferencePath, form, cts.Token);
         var body = await response.Content.ReadAsStringAsync(cts.Token);
+        Log.Info($"STT response <- Local whisper-server: HTTP {(int)response.StatusCode} in {sw.ElapsedMilliseconds} ms, {body.Length} bytes");
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"whisper-server returned {(int)response.StatusCode}: {Truncate(body)}");
 

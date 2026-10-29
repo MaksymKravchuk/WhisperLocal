@@ -12,6 +12,7 @@ public sealed class DictationResult
     public double AudioMs { get; set; }
     public double SpeechDbfs { get; set; }
     public long SttMs { get; set; }
+    public string SttProvider { get; set; } = "";
     public long LlmMs { get; set; }
     public long TotalMs { get; set; }
     public string RawText { get; set; } = "";
@@ -27,11 +28,11 @@ public sealed class DictationResult
 public sealed class DictationPipeline
 {
     private readonly ConfigManager _config;
-    private readonly ISpeechToText _stt;
+    private readonly SttRouter _stt;
     private readonly OllamaCleaner _llm;
     private readonly TextFilters _filters = new();
 
-    public DictationPipeline(ConfigManager config, ISpeechToText stt, OllamaCleaner llm)
+    public DictationPipeline(ConfigManager config, SttRouter stt, OllamaCleaner llm)
     {
         _config = config;
         _stt = stt;
@@ -72,6 +73,7 @@ public sealed class DictationPipeline
         var sw = Stopwatch.StartNew();
         result.RawText = await _stt.TranscribeAsync(AudioConvert.ToWav(pcm), ct);
         result.SttMs = sw.ElapsedMilliseconds;
+        result.SttProvider = _stt.LastProvider;
 
         var text = _filters.RemoveHallucinations(result.RawText, cfg);
         text = _filters.ApplyDictionary(text, cfg);
@@ -109,7 +111,7 @@ public sealed class DictationPipeline
     {
         r.Note = note;
         r.TotalMs = total.ElapsedMilliseconds;
-        Log.Info($"Dictation: audio={r.AudioMs / 1000:F1}s level={r.SpeechDbfs:F1}dBFS stt={r.SttMs}ms llm={r.LlmMs}ms total={r.TotalMs}ms llmUsed={r.LlmUsed}"
+        Log.Info($"Dictation: audio={r.AudioMs / 1000:F1}s level={r.SpeechDbfs:F1}dBFS stt={r.SttMs}ms{(r.SttProvider.Length > 0 ? $" ({r.SttProvider})" : "")} llm={r.LlmMs}ms total={r.TotalMs}ms llmUsed={r.LlmUsed}"
                  + (string.IsNullOrEmpty(note) ? "" : $" note: {note}"));
         if (cfg.Logging.LogText && r.RawText.Length > 0)
         {

@@ -7,6 +7,7 @@ public sealed class AppConfig
 
     public HotkeyConfig Hotkey { get; set; } = new();
     public AudioConfig Audio { get; set; } = new();
+    public SttConfig Stt { get; set; } = new();
     public WhisperConfig Whisper { get; set; } = new();
     public MemoryConfig Memory { get; set; } = new();
     public FilterConfig Filter { get; set; } = new();
@@ -62,6 +63,47 @@ public sealed class AudioConfig
 
     /// <summary>Recording stops automatically after this many seconds (0 = unlimited).</summary>
     public int MaxDurationSec { get; set; } = 120;
+}
+
+/// <summary>
+/// Which speech-to-text backend is used. Language, initial prompt and temperature come from <see cref="WhisperConfig"/>
+/// for every backend. API keys are not stored here (the config is in git): see <c>Secrets</c>.
+/// </summary>
+public sealed class SttConfig
+{
+    /// <summary>"Local" (bundled whisper-server), "Groq" or "Cloudflare".</summary>
+    public string Provider { get; set; } = SttProviders.Local;
+
+    /// <summary>When a cloud request fails, transcribe the same audio with the local whisper-server.</summary>
+    public bool FallbackToLocal { get; set; } = true;
+
+    public int CloudTimeoutSec { get; set; } = 30;
+
+    public GroqConfig Groq { get; set; } = new();
+    public CloudflareConfig Cloudflare { get; set; } = new();
+}
+
+public static class SttProviders
+{
+    public const string Local = "Local";
+    public const string Groq = "Groq";
+    public const string Cloudflare = "Cloudflare";
+}
+
+public sealed class GroqConfig
+{
+    public string Url { get; set; } = "https://api.groq.com/openai/v1/audio/transcriptions";
+
+    /// <summary>"whisper-large-v3" (same model as local) or "whisper-large-v3-turbo" (faster, weaker on Ukrainian).</summary>
+    public string Model { get; set; } = "whisper-large-v3";
+}
+
+public sealed class CloudflareConfig
+{
+    /// <summary>Cloudflare account ID (dashboard → Workers AI); the API token goes to secrets.</summary>
+    public string AccountId { get; set; } = "";
+
+    public string Model { get; set; } = "@cf/openai/whisper-large-v3-turbo";
 }
 
 public sealed class WhisperConfig
